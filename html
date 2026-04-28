@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bokföringsapp + Fakturering | Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tooltip { border-bottom: 1px dashed gray; cursor: help; }
+        .tab-btn.active { background-color: #3b82f6; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-6">
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
+        <h1 class="text-3xl font-bold mb-2">📒 Min Bokföring + Fakturering</h1>
+        <p class="text-gray-600 mb-4">All data sparas i webbläsaren. Demo med instruktioner, momsrapport och export.</p>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 border-b mb-4">
+            <button class="tab-btn active px-4 py-2 rounded-t" data-tab="dashboard">📊 Dashboard</button>
+            <button class="tab-btn px-4 py-2 rounded-t" data-tab="bokforing">📝 Manuell bokföring</button>
+            <button class="tab-btn px-4 py-2 rounded-t" data-tab="fakturor">🧾 Fakturering</button>
+            <button class="tab-btn px-4 py-2 rounded-t" data-tab="rapporter">📑 Rapporter & moms</button>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard-tab" class="tab-content">
+            <h2 class="text-xl font-semibold mb-3">Översikt</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-blue-50 p-4 rounded shadow">
+                    <p class="text-sm">Likviditet (kassa 1930)</p>
+                    <p id="likviditet" class="text-2xl font-bold">0 kr</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded shadow">
+                    <p class="text-sm">Resultat (intäkter - kostnader)</p>
+                    <p id="resultat" class="text-2xl font-bold">0 kr</p>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded shadow">
+                    <p class="text-sm">Obetalda fakturor</p>
+                    <p id="obetalda" class="text-2xl font-bold">0 kr</p>
+                </div>
+            </div>
+            <h3 class="font-semibold">Senaste verifikationer</h3>
+            <div id="senasteVer" class="text-sm space-y-1 mt-2"></div>
+        </div>
+
+        <!-- MANUELL BOKFÖRING -->
+        <div id="bokforing-tab" class="tab-content hidden">
+            <div class="border rounded-lg p-4 mb-6">
+                <h2 class="text-xl font-semibold mb-3">➕ Ny verifikation</h2>
+                <div class="bg-yellow-50 p-3 rounded text-sm mb-4">
+                    💡 <strong>Instruktion:</strong> Varje rad har kontonummer (t.ex. 1930 bank, 3000 försäljning, 5410 kontor). 
+                    Debet = pengar in på kontot, Kredit = pengar ut. Summan av debet = summan kredit.
+                    <a href="#" id="exempelMall" class="text-blue-600 block mt-1">📋 Mall: Köp kontorsmaterial 1000 kr + 25% moms</a>
+                </div>
+                <div>
+                    <label class="block font-medium">Datum</label>
+                    <input type="date" id="datum" class="border rounded p-2 mb-3 w-full" value="2025-04-28">
+                </div>
+                <div>
+                    <label class="block font-medium">Beskrivning</label>
+                    <input type="text" id="beskrivning" class="border rounded p-2 mb-3 w-full" placeholder="T.ex. Inköp">
+                </div>
+                <div id="entries-container">
+                    <div class="entry-row grid grid-cols-5 gap-2 mb-2">
+                        <input type="number" placeholder="Konto" class="konto border p-1 rounded">
+                        <input type="number" placeholder="Debet" class="debet border p-1 rounded" step="0.01">
+                        <input type="number" placeholder="Kredit" class="kredit border p-1 rounded" step="0.01">
+                        <select class="moms border p-1 rounded">
+                            <option value="none">Ingen moms</option><option>25%</option><option>12%</option><option>6%</option>
+                        </select>
+                        <input type="text" placeholder="Text" class="radtext border p-1 rounded">
+                    </div>
+                </div>
+                <button id="addRow" class="text-blue-600 text-sm mb-3">+ Lägg till rad</button>
+                <button id="saveBtn" class="bg-green-600 text-white px-4 py-2 rounded">Spara verifikation</button>
+            </div>
+            <h3 class="font-semibold mb-2">📄 Tidigare verifikationer</h3>
+            <div id="verifikationsLista" class="space-y-2"></div>
+        </div>
+
+        <!-- FAKTURERING -->
+        <div id="fakturor-tab" class="tab-content hidden">
+            <div class="border rounded-lg p-4 mb-6">
+                <h2 class="text-xl font-semibold mb-3">➕ Skapa ny faktura</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <input type="text" id="fakturaKund" placeholder="Kundnamn" class="border p-2 rounded">
+                    <input type="email" id="fakturaEmail" placeholder="E-post (valfritt)" class="border p-2 rounded">
+                    <input type="date" id="fakturaDue" class="border p-2 rounded" value="2025-05-28">
+                </div>
+                <div id="invoiceLinesContainer">
+                    <div class="invoice-line grid grid-cols-4 gap-2 mb-2">
+                        <input type="text" placeholder="Beskrivning" class="inv-desc border p-1 rounded">
+                        <input type="number" placeholder="Antal" class="inv-qty border p-1 rounded" value="1">
+                        <input type="number" placeholder="Pris exkl moms" class="inv-price border p-1 rounded" step="0.01">
+                        <select class="inv-vat border p-1 rounded"><option>25%</option><option>12%</option><option>6%</option></select>
+                    </div>
+                </div>
+                <button id="addInvoiceLine" class="text-blue-600 text-sm mb-3">+ Lägg till rad</button>
+                <button id="createInvoiceBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Skapa faktura</button>
+            </div>
+            <h3 class="font-semibold mb-2">📋 Befintliga fakturor</h3>
+            <div id="invoiceList" class="space-y-2"></div>
+        </div>
+
+        <!-- RAPPORTER & MOMS -->
+        <div id="rapporter-tab" class="tab-content hidden">
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="border p-4 rounded">
+                    <h3 class="font-bold mb-2">Momsrapport</h3>
+                    <div id="momsRapport" class="text-sm"></div>
+                    <button id="exportVerifikationerBtn" class="mt-4 bg-gray-700 text-white px-3 py-1 rounded text-sm">Exportera verifikationer (CSV)</button>
+                </div>
+                <div class="border p-4 rounded">
+                    <h3 class="font-bold mb-2">Exportera bokföring</h3>
+                    <button id="exportAllBtn" class="bg-gray-700 text-white px-3 py-1 rounded text-sm">Ladda ner alla verifikationer (CSV)</button>
+                    <p class="text-xs text-gray-500 mt-2">Format: datum, beskrivning, konto, debet, kredit, moms</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Data och localStorage ---
+        let verifikationer = JSON.parse(localStorage.getItem('bokforing_ver') || '[]');
+        let fakturor = JSON.parse(localStorage.getItem('bokforing_fakturor') || '[]');
+
+        function saveAll() {
+            localStorage.setItem('bokforing_ver', JSON.stringify(verifikationer));
+            localStorage.setItem('bokforing_fakturor', JSON.stringify(fakturor));
+        }
+
+        // --- Hjälpfunktioner för bokföring ---
+        function updateDashboard() {
+            // Likviditet: saldo på konto 1930
+            let saldo1930 = 0;
+            verifikationer.forEach(v => {
+                v.entries.forEach(e => {
+                    if (e.konto == 1930) {
+                        saldo1930 += (parseFloat(e.debet) || 0) - (parseFloat(e.kredit) || 0);
+                    }
+                });
+            });
+            document.getElementById('likviditet').innerText = saldo1930.toFixed(2) + ' kr';
+            
+            // Resultat: intäkter (3xxx, kredit - debet) - kostnader (4xxx-7xxx, debet - kredit)
+            let intakter = 0, kostnader = 0;
+            verifikationer.forEach(v => {
+                v.entries.forEach(e => {
+                    let konto = parseInt(e.konto);
+                    if (konto >= 3000 && konto < 4000) intakter += (parseFloat(e.kredit)||0) - (parseFloat(e.debet)||0);
+                    if (konto >= 4000 && konto < 8000) kostnader += (parseFloat(e.debet)||0) - (parseFloat(e.kredit)||0);
+                });
+            });
+            let resultat = intakter - kostnader;
+            document.getElementById('resultat').innerText = resultat.toFixed(2) + ' kr';
+            
+            // Obetalda fakturor
+            let obetaldaSum = fakturor.filter(f => f.status !== 'betald').reduce((s, f) => s + f.total, 0);
+            document.getElementById('obetalda').innerText = obetaldaSum.toFixed(2) + ' kr';
+
+            // Senaste 3 verifikationer
+            let senaste = [...verifikationer].reverse().slice(0,3);
+            let html = senaste.map(v => `<div><strong>${v.datum}</strong> ${v.beskrivning} (${v.entries.length} rader)</div>`).join('');
+            document.getElementById('senasteVer').innerHTML = html || 'Inga verifikationer än.';
+        }
+
+        function renderVerifikationer() {
+            const container = document.getElementById('verifikationsLista');
+            if (!verifikationer.length) { container.innerHTML = '<p class="text-gray-500">Inga verifikationer.</p>'; return; }
+            container.innerHTML = verifikationer.map((v, idx) => `
+                <div class="border rounded p-3 bg-gray-50">
+                    <div class="font-bold flex justify-between">
+                        <span>${v.datum} – ${v.beskrivning}</span>
+                        <button onclick="raderaVer(${idx})" class="text-red-500 text-xs">❌ Ta bort</button>
+                    </div>
+                    <table class="w-full text-sm mt-1">
+                        <thead><tr><th>Konto</th><th>Debet</th><th>Kredit</th><th>Moms</th><th>Text</th></tr></thead>
+                        <tbody>
+                            ${v.entries.map(e => `<tr><td>${e.konto}</td><td>${e.debet||''}</td><td>${e.kredit||''}</td><td>${e.moms}</td><td>${e.text||''}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `).join('');
+        }
+
+        function raderaVer(idx) {
+            verifikationer.splice(idx,1);
+            saveAll();
+            renderVerifikationer();
+            updateDashboard();
+            updateMomsRapport();
+        }
+
+        function sparaVerifikation() {
+            const datum = document.getElementById('datum').value;
+            const beskrivning = document.getElementById('beskrivning').value;
+            const rows = document.querySelectorAll('#entries-container .entry-row');
+            let entries = [];
+            let totalDebet = 0, totalKredit = 0;
+            rows.forEach(row => {
+                let konto = row.querySelector('.konto').value;
+                if (!konto) return;
+                let debet = parseFloat(row.querySelector('.debet').value) || 0;
+                let kredit = parseFloat(row.querySelector('.kredit').value) || 0;
+                let moms = row.querySelector('.moms').value;
+                let text = row.querySelector('.radtext').value;
+                entries.push({ konto, debet, kredit, moms, text });
+                totalDebet += debet;
+                totalKredit += kredit;
+            });
+            if (Math.abs(totalDebet - totalKredit) > 0.01) {
+                alert(`Summa debet (${totalDebet}) och kredit (${totalKredit}) måste vara lika!`);
+                return;
+            }
+            if (entries.length === 0) return;
+            verifikationer.push({ datum, beskrivning, entries });
+            saveAll();
+            renderVerifikationer();
+            updateDashboard();
+            updateMomsRapport();
+            // Rensa formulär men behåll en tom rad
+            document.getElementById('beskrivning').value = '';
+            document.getElementById('entries-container').innerHTML = '';
+            addNewRow();
+        }
+
+        function addNewRow() {
+            const container = document.getElementById('entries-container');
+            const row = document.createElement('div');
+            row.className = 'entry-row grid grid-cols-5 gap-2 mb-2';
+            row.innerHTML = `
+                <input type="number" placeholder="Konto" class="konto border p-1 rounded">
+                <input type="number" placeholder="Debet" class="debet border p-1 rounded" step="0.01">
+                <input type="number" placeholder="Kredit" class="kredit border p-1 rounded" step="0.01">
+                <select class="moms border p-1 rounded"><option value="none">Ingen moms</option><option>25%</option><option>12%</option><option>6%</option></select>
+                <input type="text" placeholder="Text" class="radtext border p-1 rounded">
+            `;
+            container.appendChild(row);
+        }
+
+        // Mall för kontorsmaterial
+        function applyMall() {
+            const container = document.getElementById('entries-container');
+            container.innerHTML = '';
+            const row1 = createEntryRow(5410, 1000, 0, '25%', 'Papper');
+            const row2 = createEntryRow(2640, 250, 0, 'none', 'Moms');
+            const row3 = createEntryRow(1930, 0, 1250, 'none', 'Betalning');
+            container.append(row1, row2, row3);
+            document.getElementById('beskrivning').value = 'Köp kontorsmaterial';
+        }
+        function createEntryRow(konto, debet, kredit, moms, text) {
+            const div = document.createElement('div');
+            div.className = 'entry-row grid grid-cols-5 gap-2 mb-2';
+            div.innerHTML = `
+                <input type="number" class="konto border p-1 rounded" value="${konto}">
+                <input type="number" class="debet border p-1 rounded" value="${debet}" step="0.01">
+                <input type="number" class="kredit border p-1 rounded" value="${kredit}" step="0.01">
+                <select class="moms border p-1 rounded">${momsOptions(moms)}</select>
+                <input type="text" class="radtext border p-1 rounded" value="${text}">
+            `;
+            return div;
+        }
+        function momsOptions(selected) {
+            const opts = ['none','25%','12%','6%'];
+            return opts.map(v => `<option value="${v}" ${v===selected?'selected':''}>${v==='none'?'Ingen moms':v}</option>`).join('');
+        }
+
+        // --- Fakturering ---
+        function renderInvoices() {
+            const container = document.getElementById('invoiceList');
+            if (!fakturor.length) { container.innerHTML = '<p class="text-gray-500">Inga fakturor.</p>'; return; }
+            container.innerHTML = fakturor.map((inv, idx) => `
+                <div class="border p-3 rounded bg-white flex justify-between items-center">
+                    <div>
+                        <span class="font-bold">${inv.kund}</span> - ${inv.datum} (förfaller ${inv.dueDate})<br>
+                        Totalt: ${inv.total} kr | Status: ${inv.status === 'betald' ? '✅ Betald' : '🟡 Obetald'}
+                    </div>
+                    <div>
+                        ${inv.status !== 'betald' ? `<button onclick="markeraBetald(${idx})" class="bg-green-500 text-white px-2 py-1 rounded text-sm mr-1">Betala</button>` : ''}
+                        <button onclick="raderaFaktura(${idx})" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Radera</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function skapaFaktura() {
+            const kund = document.getElementById('fakturaKund').value.trim();
+            if (!kund) { alert('Ange kundnamn'); return; }
+            const dueDate = document.getElementById('fakturaDue').value;
+            const lines = [];
+            const rows = document.querySelectorAll('#invoiceLinesContainer .invoice-line');
+            let total = 0;
+            rows.forEach(row => {
+                const desc = row.querySelector('.inv-desc').value;
+                const qty = parseFloat(row.querySelector('.inv-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.inv-price').value) || 0;
+                const vatPercent = parseFloat(row.querySelector('.inv-vat').value);
+                if (!desc || qty===0 || price===0) return;
+                const sumExVat = qty * price;
+                const vat = sumExVat * (vatPercent/100);
+                const radSum = sumExVat + vat;
+                total += radSum;
+                lines.push({ desc, qty, price, vatPercent, sumExVat, vat });
+            });
+            if (!lines.length) { alert('Minst en produktrad krävs'); return; }
+            const nyFaktura = {
+                id: Date.now(),
+                kund: kund,
+                email: document.getElementById('fakturaEmail').value,
+                datum: new Date().toISOString().slice(0,10),
+                dueDate: dueDate,
+                total: total,
+                status: 'skickad',
+                lines: lines
+            };
+            fakturor.push(nyFaktura);
+            saveAll();
+            renderInvoices();
+            updateDashboard();
+            // Rensa formulär
+            document.getElementById('fakturaKund').value = '';
+            document.getElementById('fakturaEmail').value = '';
+            document.getElementById('invoiceLinesContainer').innerHTML = '';
+            addInvoiceLineRow();
+        }
+
+        function addInvoiceLineRow() {
+            const container = document.getElementById('invoiceLinesContainer');
+            const div = document.createElement('div');
+            div.className = 'invoice-line grid grid-cols-4 gap-2 mb-2';
+            div.innerHTML = `
+                <input type="text" placeholder="Beskrivning" class="inv-desc border p-1 rounded">
+                <input type="number" placeholder="Antal" class="inv-qty border p-1 rounded" value="1">
+                <input type="number" placeholder="Pris exkl moms" class="inv-price border p-1 rounded" step="0.01">
+                <select class="inv-vat border p-1 rounded"><option>25%</option><option>12%</option><option>6%</option></select>
+            `;
+            container.appendChild(div);
+        }
+
+        function markeraBetald(idx) {
+            fakturor[idx].status = 'betald';
+            saveAll();
+            renderInvoices();
+            updateDashboard();
+            // Här kan man även skapa en verifikation automatiskt (kundfordran -> bank)
+        }
+
+        function raderaFaktura(idx) {
+            fakturor.splice(idx,1);
+            saveAll();
+            renderInvoices();
+            updateDashboard();
+        }
+
+        // --- Momsrapport ---
+        function updateMomsRapport() {
+            let moms = { '25%':0, '12%':0, '6%':0 };
+            verifikationer.forEach(v => {
+                v.entries.forEach(e => {
+                    if (e.moms !== 'none') {
+                        let bas = (parseFloat(e.debet) || parseFloat(e.kredit) || 0);
+                        let proc = parseInt(e.moms);
+                        moms[e.moms] += bas * (proc/100);
+                    }
+                });
+            });
+            const html = `<p>25% moms: ${moms['25%'].toFixed(2)} kr</p>
+                          <p>12% moms: ${moms['12%'].toFixed(2)} kr</p>
+                          <p>6% moms: ${moms['6%'].toFixed(2)} kr</p>`;
+            document.getElementById('momsRapport').innerHTML = html;
+        }
+
+        // Export CSV
+        function exportVerifikationerCSV() {
+            let rows = [['Datum','Beskrivning','Konto','Debet','Kredit','Moms','Text']];
+            verifikationer.forEach(v => {
+                v.entries.forEach(e => {
+                    rows.push([v.datum, v.beskrivning, e.konto, e.debet, e.kredit, e.moms, e.text]);
+                });
+            });
+            let csv = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+            downloadFile(csv, 'verifikationer.csv', 'text/csv');
+        }
+
+        function downloadFile(content, filename, mime) {
+            const blob = new Blob([content], {type: mime});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        // --- Tab switching ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+            if (tabId === 'dashboard') updateDashboard();
+            if (tabId === 'rapporter') updateMomsRapport();
+        }
+
+        // --- Event listeners ---
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+        document.getElementById('addRow')?.addEventListener('click', addNewRow);
+        document.getElementById('saveBtn')?.addEventListener('click', sparaVerifikation);
+        document.getElementById('exempelMall')?.addEventListener('click', (e) => { e.preventDefault(); applyMall(); });
+        document.getElementById('addInvoiceLine')?.addEventListener('click', addInvoiceLineRow);
+        document.getElementById('createInvoiceBtn')?.addEventListener('click', skapaFaktura);
+        document.getElementById('exportVerifikationerBtn')?.addEventListener('click', exportVerifikationerCSV);
+        document.getElementById('exportAllBtn')?.addEventListener('click', exportVerifikationerCSV);
+
+        // Initiering
+        function init() {
+            if (document.querySelectorAll('#entries-container .entry-row').length === 0) addNewRow();
+            if (document.querySelectorAll('#invoiceLinesContainer .invoice-line').length === 0) addInvoiceLineRow();
+            renderVerifikationer();
+            renderInvoices();
+            updateDashboard();
+            updateMomsRapport();
+            switchTab('dashboard');
+        }
+        init();
+    </script>
+</body>
+</html>
